@@ -61,8 +61,7 @@ def make_dir(dir):
 
 
 if __name__ == '__main__':
-    # video_list = glob.glob('../dataset/*.mp4')
-    video_list = glob.glob('../dataset/enterface/*/*/*/*.avi')
+    video_list = glob.glob('../dataset/eNTERFACE/*/*/*/*.avi')
     original_audio_dir = '../output/original_audio'
     segment_audio_dir = '../output/segment_audio'
     segment_image_dir = '../output/segment_image'

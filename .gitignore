@@ -1,7 +1,7 @@
 # Ignore Mac system files
 .DS_store
 
-# Ignore node_modules folder
+# Ignore output, dataset checkpoints folder
 output/
 dataset/
 checkpoints/
