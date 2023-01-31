@@ -2,6 +2,6 @@
 .DS_store
 
 # Ignore node_modules folder
-output
-dataset
-checkpoints
+output/
+dataset/
+checkpoints/
