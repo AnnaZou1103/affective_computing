@@ -10,18 +10,23 @@ import cv2
 
 def combine_feature(dataset, data_dir):
     all_dataset = []
+    emotion = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'surprise']
     for i in range(len(dataset["features"])):
-        image_path = data_dir + '/segment_image/' + dataset["label"][i] + '/' + dataset["name"][i] + '*.jpg'
+        image_path = data_dir + '/segment_image/' + dataset["name"][i] + '*.jpg'
+
         image_list = glob.glob(image_path)
         image_array = []
         idx = 0
         for image in image_list:
             idx += 1
-            if idx < 5:
-                image_array.append(cv2.imread(image))
-            else:
-                break
-        all_dataset.append((dataset["features"][i], image_array, dataset["label"][i]))
+            # if idx <5:
+            #     image_array.append(cv2.imread(image))
+            # else:
+            #     break
+            image_array = cv2.imread(image_list[0])
+            image_array = cv2.resize(image_array, (256, 256))
+            image_array = np.transpose(image_array, (2, 0, 1))
+        all_dataset.append([dataset["features"][i], image_array, emotion.index(dataset["label"][i])])
     return all_dataset
 
 
@@ -40,7 +45,7 @@ def pad_tensor(vec, pad, dim):
 
 
 def collate_fn(instances):
-    max_len = max(map(lambda x: x[0].shape[1], instances))
+    max_len = 512
     batch = []
     for (feature, image, label) in instances:
         batch.append((pad_tensor(feature, pad=max_len, dim=1), image, label))

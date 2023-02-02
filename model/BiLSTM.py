@@ -8,7 +8,6 @@ class BiLSTM(nn.Module):
         self.relu1 = nn.ReLU()
         self.hidden2 = nn.Linear(hidden_1, hidden_2)
         self.relu2 = nn.ReLU()
-        # self.fc = nn.Linear(hidden_2, out_size)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -22,5 +21,4 @@ class BiLSTM(nn.Module):
         emb = self.relu2(emb)
 
         emb = self.dropout(emb)
-        # scores = self.fc(emb)
         return emb

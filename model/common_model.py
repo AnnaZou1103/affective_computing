@@ -4,25 +4,19 @@ from torch.nn import functional as F
 
 
 class MMDL(nn.Module):
-    def __init__(self, encoders, fusion, head, has_padding=False):
+    def __init__(self, encoders, fusion, head):
         super(MMDL, self).__init__()
         self.encoders = nn.ModuleList(encoders)
         self.fuse = fusion
         self.head = head
-        self.has_padding = has_padding
 
-    def forward(self, inputs, training=False):
+    def forward(self, inputs):
         outs = []
-        if self.has_padding:
-            for i in range(len(inputs[0])):
-                outs.append(self.encoders[i](
-                    [inputs[0][i], inputs[1][i]], training=training))
-        else:
-            for i in range(len(inputs)):
-                outs.append(self.encoders[i](inputs[i], training=training))
-        out = self.fuse(outs, training=training)
+        for i in range(len(inputs)):
+          outs.append(self.encoders[i](inputs[i]))
+        out = self.fuse(outs)
 
-        return self.head(out, training=training)
+        return self.head(out)
 
 
 class MLP(torch.nn.Module):
@@ -62,3 +56,22 @@ class MLP(torch.nn.Module):
         if self.output_each_layer:
             return [0, x, output, self.lklu(output2)]
         return output2
+
+
+class Identity(nn.Module):
+    """Identity Module."""
+
+    def __init__(self):
+        """Initialize Identity Module."""
+        super().__init__()
+
+    def forward(self, x):
+        """Apply Identity to Input.
+
+        Args:
+            x (torch.Tensor): Layer Input
+
+        Returns:
+            torch.Tensor: Layer Output
+        """
+        return x
