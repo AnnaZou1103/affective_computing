@@ -4,16 +4,26 @@ from torch.nn import functional as F
 
 
 class MMDL(nn.Module):
-    def __init__(self, encoders, fusion, head):
+    def __init__(self, image_dim, encoders, fusion, head):
         super(MMDL, self).__init__()
         self.encoders = nn.ModuleList(encoders)
         self.fuse = fusion
         self.head = head
+        self.attention_block = AttentionBlock(image_dim)
 
     def forward(self, inputs):
-        outs = []
-        for i in range(len(inputs)):
-          outs.append(self.encoders[i](inputs[i]))
+        outs = [self.encoders[0](inputs[0])]
+
+        image_feature = []
+        for input in inputs[1].permute(1, 0, 2, 3, 4):
+            image_feature.append(self.encoders[1](input))
+        image_feature = torch.stack(image_feature).permute(1,0,2)
+        reduced_image = []
+        for image in image_feature:
+            reduced_image.append(self.attention_block(image))
+        reduced_image = torch.stack(reduced_image)
+
+        outs.append(reduced_image)
         out = self.fuse(outs)
 
         return self.head(out)
@@ -75,3 +85,21 @@ class Identity(nn.Module):
             torch.Tensor: Layer Output
         """
         return x
+
+
+class AttentionBlock(nn.Module):
+    def __init__(self, input_size, scale=0.3):
+        super(AttentionBlock, self).__init__()
+        self.fc1 = nn.Linear(input_size, input_size)
+        self.fc2 = nn.Linear(input_size, input_size, bias=False)
+
+        self.tanh = nn.Tanh()
+        self.softmax = nn.Softmax()
+        self.scale = scale
+
+    def forward(self, x):
+        x = self.fc1(x)
+        weight = self.fc2(self.tanh(x))
+        weight = self.softmax(weight * self.scale)
+
+        return torch.sum(x * weight, dim=0)

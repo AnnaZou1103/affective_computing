@@ -1,11 +1,11 @@
 import numpy as np
 from torch.utils.data import DataLoader
-from torchvision import datasets
 import pickle
 import torch
 import torch.utils.data as data
 import glob
 import cv2
+import PIL.Image as Image
 
 
 def combine_feature(dataset, data_dir):
@@ -13,19 +13,37 @@ def combine_feature(dataset, data_dir):
     emotion = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'surprise']
     for i in range(len(dataset["features"])):
         image_path = data_dir + '/segment_image/' + dataset["name"][i] + '*.jpg'
+        image_list = glob.glob(image_path)
+
+        image_array=[]
+        for i in range(5):
+            image = cv2.imread(image_list[i])
+            image = cv2.resize(image, (256, 256))
+            image = np.transpose(image, (2, 0, 1))
+            image_array.append(image)
+
+        all_dataset.append([dataset["features"][i], image_array, emotion.index(dataset["label"][i])])
+    return all_dataset
+
+
+def combine_feature_with_four_images(dataset, data_dir):
+    all_dataset = []
+    emotion = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'surprise']
+    for i in range(len(dataset["features"])):
+        image_path = data_dir + '/segment_image/' + dataset["name"][i] + '*.jpg'
 
         image_list = glob.glob(image_path)
-        image_array = []
-        idx = 0
-        for image in image_list:
-            idx += 1
-            # if idx <5:
-            #     image_array.append(cv2.imread(image))
-            # else:
-            #     break
-            image_array = cv2.imread(image_list[0])
-            image_array = cv2.resize(image_array, (256, 256))
-            image_array = np.transpose(image_array, (2, 0, 1))
+        to_image = Image.new('RGB', (256, 256))
+
+        for y in range(1, 3):
+            for x in range(1, 3):
+                from_image = Image.open(image_list[(y - 1) * 2 + x])
+                from_image = from_image.resize((128, 128), Image.ANTIALIAS)
+                to_image.paste(from_image, ((x - 1) * 128, (y - 1) * 128))
+
+        to_image.save(dataset["name"][i] + '.jpg')
+        image_array = np.transpose(to_image, (2, 0, 1))
+
         all_dataset.append([dataset["features"][i], image_array, emotion.index(dataset["label"][i])])
     return all_dataset
 
@@ -59,14 +77,16 @@ def collate_fn(instances):
     return (features, images, labels)
 
 
-def get_dataloader(data_dir, batch_size=16):
+def get_dataloader(data_dir, batch_size=16, four_images=False):
     audio_features = pickle.load(open(data_dir + '/audio_feature.pkl', 'rb'))
-
-    dataset = combine_feature(audio_features, data_dir)
+    if four_images:
+        dataset = combine_feature(audio_features, data_dir)
+    else:
+        dataset = combine_feature_with_four_images(audio_features, data_dir)
 
     data_size = len(dataset)
-    
-    dataset_sizes = {"train": int(data_size * 0.8), "test": data_size-int(data_size * 0.8)}
+
+    dataset_sizes = {"train": int(data_size * 0.8), "test": data_size - int(data_size * 0.8)}
 
     train_set, test_set = data.random_split(dataset, [dataset_sizes["train"], dataset_sizes["test"]])
 
@@ -79,4 +99,3 @@ def get_dataloader(data_dir, batch_size=16):
                                         collate_fn=collate_fn)
 
     return trains, tests
-

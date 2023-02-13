@@ -1,7 +1,7 @@
 from utils.get_data import get_dataloader
 import torch
 from torch import nn
-from model.common_model import MLP, MMDL, Identity
+from model.common_model import MLP, MMDL, Identity, AttentionBlock
 from model.common_fusion import Concat
 from model.BiLSTM import BiLSTM
 from timm.models.swin_transformer_v2 import swinv2_tiny_window16_256
@@ -32,7 +32,7 @@ def deal_with_objective(objective, pred, truth, args):
         return objective(pred, truth, args)
 
 def train(
-        encoders, fusion, head, train_dataloader, valid_dataloader, total_epochs, additional_optimizing_modules=[],
+        encoders, fusion, head, image_dim, train_dataloader, valid_dataloader, total_epochs, additional_optimizing_modules=[],
         early_stop=False, task="classification", optimtype=torch.optim.RMSprop, lr=0.001, weight_decay=0.0,
         objective=nn.CrossEntropyLoss(), auprc=False, save='best.pt', validtime=False, objective_args_dict=None,
         input_to_float=True, clip_val=8,):
@@ -58,7 +58,7 @@ def train(
     :param clip_val: grad clipping limit
     """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = MMDL(encoders, fusion, head).to(device)
+    model = MMDL(image_dim, encoders, fusion, head).to(device)
 
     additional_params = []
     for m in additional_optimizing_modules:
@@ -268,7 +268,8 @@ if __name__ == '__main__':
 
     audio_model = BiLSTM(input_size=audio_input_dim, hidden_1=HIDDEN_1, hidden_2=HIDDEN_2)
     image_model = swinv2_tiny_window16_256(pretrained=True)
-    em_dim = HIDDEN_2 + image_model.head.in_features
+    image_dim = image_model.head.in_features
+    em_dim = HIDDEN_2 + image_dim
     image_model.head = Identity()
 
     encoders = [audio_model.to(device), image_model.to(device)]
@@ -277,6 +278,6 @@ if __name__ == '__main__':
 
     fusion = Concat().to(device)
 
-    train(encoders, fusion, head, train_loader, val_loader, EPOCHS, task="classification", optimtype=torch.optim.AdamW,
+    train(encoders, fusion, head, image_dim, train_loader, val_loader, EPOCHS, task="classification", optimtype=torch.optim.AdamW,
           early_stop=True, lr=model_lr, save=model_save_path, weight_decay=weight_decay,
           objective=torch.nn.CrossEntropyLoss())
