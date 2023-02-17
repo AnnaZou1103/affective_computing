@@ -4,6 +4,7 @@ import librosa
 import pickle
 import glob
 from typing import Any, Dict
+import re
 
 if __name__ == '__main__':
     input_path = '../output/segment_audio/*/*.wav'
@@ -26,7 +27,8 @@ if __name__ == '__main__':
 
     for file in glob.glob(input_path):
         label = file.split('/')[-2]
-        name = file.split('/')[-1].replace('.wav','')
+        name = file.split('/')[-1]
+        name = re.findall(r's\d*_.*_', name)[0]
 
         wav, rate = librosa.load(file, sr=16000, mono=True, res_type="kaiser_fast")
         tensor = torch.tensor(wav, device="cuda").unsqueeze(0)

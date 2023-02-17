@@ -14,13 +14,12 @@ class MMDL(nn.Module):
     def forward(self, inputs):
         outs = [self.encoders[0](inputs[0])]
 
-        image_feature = []
-        for input in inputs[1].permute(1, 0, 2, 3, 4):
-            image_feature.append(self.encoders[1](input))
-        image_feature = torch.stack(image_feature).permute(1,0,2)
         reduced_image = []
-        for image in image_feature:
-            reduced_image.append(self.attention_block(image))
+        start_index=0
+        for num in inputs[2]:
+            image_feature = self.encoders[1](inputs[1][start_index: start_index+int(num.item())])
+            reduced_image.append(self.attention_block(image_feature))
+            start_index += int(num.item())
         reduced_image = torch.stack(reduced_image)
 
         outs.append(reduced_image)
@@ -88,13 +87,13 @@ class Identity(nn.Module):
 
 
 class AttentionBlock(nn.Module):
-    def __init__(self, input_size, scale=0.3):
+    def __init__(self, input_size, scale=0.8):
         super(AttentionBlock, self).__init__()
         self.fc1 = nn.Linear(input_size, input_size)
         self.fc2 = nn.Linear(input_size, input_size, bias=False)
 
         self.tanh = nn.Tanh()
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=0)
         self.scale = scale
 
     def forward(self, x):

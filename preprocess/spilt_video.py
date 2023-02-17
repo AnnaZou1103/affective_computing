@@ -16,7 +16,7 @@ def extract_audio(lip_motion_range, video_file_path, out_dir):
         start_time = audio_range[0]
         end_time = audio_range[1]
         sub_clip = my_clip.subclip(start_time, end_time)
-        audio_file_path = video_file_path.split('/')[-1].replace('.avi', '') + '_' + str(start_time) + '.wav'
+        audio_file_path = video_file_path.split('/')[-1].replace('.avi', '') + '_'+str(lip_motion_range.index(audio_range))+ '_' + str(start_time) + '.wav'
         audio_file_path = os.path.join(out_dir, audio_file_path)
         sub_clip.audio.write_audiofile(audio_file_path)
 
@@ -73,7 +73,7 @@ def lip_motion_detection(video_path, out_dir, detector, predictor, expand_name='
                     if (frame_num - start_frame) % frame_frequency == 0:
                         cv2.imwrite(
                             os.path.join(out_dir,
-                                         video_path.split('/')[-1].replace('avi', '') + '_' + str(index) + '_' + str(
+                                         video_path.split('/')[-1].replace('.avi', '') + '_' + str(index) + '_' + str(
                                              frame_num) + expand_name), frame)
 
                 elif start_frame > end_frame and frame_num - start_frame > fps:
@@ -95,7 +95,7 @@ def make_dir(dir):
 
 
 if __name__ == '__main__':
-    video_list = glob.glob('../dataset/eNTERFACE/*/anger/*/*.avi')
+    video_list = glob.glob('../dataset/eNTERFACE/subject 1/*/*/*.avi')
     idx = 0
 
     model_path = '../checkpoints/shape_predictor_68_face_landmarks.dat'

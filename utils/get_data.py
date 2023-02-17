@@ -12,17 +12,16 @@ def combine_feature(dataset, data_dir):
     all_dataset = []
     emotion = ['anger', 'disgust', 'fear', 'happiness', 'sadness', 'surprise']
     for i in range(len(dataset["features"])):
-        image_path = data_dir + '/segment_image/' + dataset["name"][i] + '*.jpg'
+        image_path = data_dir + '/segment_image/' + dataset["label"][i]+'/'+dataset["name"][i] + '*.jpg'
         image_list = glob.glob(image_path)
 
         image_array=[]
-        for i in range(5):
-            image = cv2.imread(image_list[i])
+        for image in image_list:
+            image = cv2.imread(image)
             image = cv2.resize(image, (256, 256))
             image = np.transpose(image, (2, 0, 1))
             image_array.append(image)
-
-        all_dataset.append([dataset["features"][i], image_array, emotion.index(dataset["label"][i])])
+        all_dataset.append([dataset["features"][i], image_array, len(image_array), emotion.index(dataset["label"][i])])
     return all_dataset
 
 
@@ -65,24 +64,24 @@ def pad_tensor(vec, pad, dim):
 def collate_fn(instances):
     max_len = 512
     batch = []
-    for (feature, image, label) in instances:
-        batch.append((pad_tensor(feature, pad=max_len, dim=1), image, label))
+    for (feature, image, num, label) in instances:
+        batch.append((pad_tensor(feature, pad=max_len, dim=1), image, num, label))
 
     f = list(map(lambda x: x[0], batch))
     i = list(map(lambda x: x[1], batch))
-    l = list(map(lambda x: x[2], batch))
+    n = list(map(lambda x: x[2], batch))
+    l = list(map(lambda x: x[3], batch))
+
     features = torch.stack(f, dim=0)
-    images = torch.Tensor(i)
+    images = torch.concat([torch.Tensor(x) for x in i], dim=0)
+    number = torch.Tensor(n)
     labels = torch.Tensor(l)
-    return (features, images, labels)
+    return features, images, number, labels
 
 
-def get_dataloader(data_dir, batch_size=16, four_images=False):
+def get_dataloader(data_dir, batch_size=16):
     audio_features = pickle.load(open(data_dir + '/audio_feature.pkl', 'rb'))
-    if four_images:
-        dataset = combine_feature(audio_features, data_dir)
-    else:
-        dataset = combine_feature_with_four_images(audio_features, data_dir)
+    dataset = combine_feature(audio_features, data_dir)
 
     data_size = len(dataset)
 

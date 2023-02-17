@@ -10,6 +10,7 @@ import time
 
 softmax = nn.Softmax()
 
+
 def getallparams(li):
     params = 0
     for module in li:
@@ -17,25 +18,29 @@ def getallparams(li):
             params += param.numel()
     return params
 
+
 def deal_with_objective(objective, pred, truth, args):
     """Alter inputs depending on objective function, to deal with different objective arguments."""
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if type(objective) == nn.CrossEntropyLoss:
         if len(truth.size()) == len(pred.size()):
-            truth1 = truth.squeeze(len(pred.size())-1)
+            truth1 = truth.squeeze(len(pred.size()) - 1)
         else:
             truth1 = truth
         return objective(pred, truth1.long().to(device))
-    elif type(objective) == nn.MSELoss or type(objective) == nn.modules.loss.BCEWithLogitsLoss or type(objective) == nn.L1Loss:
+    elif type(objective) == nn.MSELoss or type(objective) == nn.modules.loss.BCEWithLogitsLoss or type(
+            objective) == nn.L1Loss:
         return objective(pred, truth.float().to(device))
     else:
         return objective(pred, truth, args)
 
+
 def train(
-        encoders, fusion, head, image_dim, train_dataloader, valid_dataloader, total_epochs, additional_optimizing_modules=[],
-        early_stop=False, task="classification", optimtype=torch.optim.RMSprop, lr=0.001, weight_decay=0.0,
+        encoders, fusion, head, image_dim, train_dataloader, valid_dataloader, total_epochs,
+        additional_optimizing_modules=[],
+        early_stop=False, optimtype=torch.optim.RMSprop, lr=0.001, weight_decay=0.0,
         objective=nn.CrossEntropyLoss(), auprc=False, save='best.pt', validtime=False, objective_args_dict=None,
-        input_to_float=True, clip_val=8,):
+        input_to_float=True, clip_val=8, ):
     """
     Handle running a simple supervised training loop.
 
@@ -45,7 +50,6 @@ def train(
     :param total_epochs: maximum number of epochs to train
     :param additional_optimizing_modules: list of modules, include all modules that you want to be optimized by the optimizer other than those in encoders, fusion, head (for example, decoders in MVAE)
     :param early_stop: whether to stop early if valid performance does not improve over 7 epochs
-    :param task: type of task, currently support "classification","regression","multilabel"
     :param optimtype: type of optimizer to use
     :param lr: learning rate
     :param weight_decay: weight decay of optimizer
@@ -65,7 +69,7 @@ def train(
         additional_params.extend(
             [p for p in m.parameters() if p.requires_grad])
     op = optimtype([p for p in model.parameters() if p.requires_grad] +
-                    additional_params, lr=lr, weight_decay=weight_decay)
+                   additional_params, lr=lr, weight_decay=weight_decay)
     bestvalloss = 10000
     bestacc = 0
     bestf1 = 0
@@ -73,7 +77,10 @@ def train(
 
     def _processinput(inp):
         if input_to_float:
-            return inp.float()
+            if type(inp) == list:
+                return [i.float() for i in inp]
+            else:
+                return inp.float()
         else:
             return inp
 
@@ -114,7 +121,7 @@ def train(
             for j in valid_dataloader:
                 model.train()
                 out = model([_processinput(i).to(device)
-                              for i in j[:-1]])
+                             for i in j[:-1]])
 
                 if not (objective_args_dict is None):
                     objective_args_dict['reps'] = model.reps
@@ -156,6 +163,7 @@ def train(
         if validtime:
             print("valid time:  " + str(validendtime - validstarttime))
             print("Valid total: " + str(totals))
+
 
 def single_test(
         model, test_dataloader, is_packed=False,
@@ -250,6 +258,7 @@ def single_test(
             print("acc: " + str(accs) + ', ' + str(acc2))
             return {'Accuracy': accs}
 
+
 if __name__ == '__main__':
     audio_input_dim = 512
     HIDDEN_1 = 256
@@ -278,6 +287,6 @@ if __name__ == '__main__':
 
     fusion = Concat().to(device)
 
-    train(encoders, fusion, head, image_dim, train_loader, val_loader, EPOCHS, task="classification", optimtype=torch.optim.AdamW,
+    train(encoders, fusion, head, image_dim, train_loader, val_loader, EPOCHS, optimtype=torch.optim.AdamW,
           early_stop=True, lr=model_lr, save=model_save_path, weight_decay=weight_decay,
           objective=torch.nn.CrossEntropyLoss())
