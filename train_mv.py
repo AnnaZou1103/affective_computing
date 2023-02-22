@@ -1,8 +1,7 @@
 from utils.get_data import get_dataloader
 import torch
 from torch import nn
-from model.common_model import MLP, MMDL, Identity, AttentionBlock
-from model.common_fusion import Concat
+from model.common_model import MajorityVoting
 from model.BiLSTM import BiLSTM
 from timm.models.swin_transformer_v2 import swinv2_tiny_window16_256
 from utils.performance import AUPRC, f1_score, accuracy, eval_affect
@@ -34,22 +33,19 @@ def deal_with_objective(objective, pred, truth, args):
     else:
         return objective(pred, truth, args)
 
-
 def train(
-        encoders, fusion, head, image_dim, train_dataloader, valid_dataloader, total_epochs,
-        additional_optimizing_modules=[],
-        early_stop=False, optimtype=torch.optim.RMSprop, lr=0.001, weight_decay=0.0,
+        model, train_dataloader, valid_dataloader, total_epochs, additional_optimizing_modules=[],
+        early_stop=False, task="classification", optimtype=torch.optim.RMSprop, lr=0.001, weight_decay=0.0,
         objective=nn.CrossEntropyLoss(), auprc=False, save='best.pt', validtime=False, objective_args_dict=None,
-        input_to_float=True, clip_val=8, ):
+        input_to_float=True, clip_val=8,):
     """
     Handle running a simple supervised training loop.
 
     :param encoders: list of modules, unimodal encoders for each input modality in the order of the modality input data.
-    :param fusion: fusion module, takes in outputs of encoders in a list and outputs fused representation
-    :param head: classification or prediction head, takes in output of fusion module and outputs the classification or prediction results that will be sent to the objective function for loss calculation
     :param total_epochs: maximum number of epochs to train
     :param additional_optimizing_modules: list of modules, include all modules that you want to be optimized by the optimizer other than those in encoders, fusion, head (for example, decoders in MVAE)
     :param early_stop: whether to stop early if valid performance does not improve over 7 epochs
+    :param task: type of task, currently support "classification","regression","multilabel"
     :param optimtype: type of optimizer to use
     :param lr: learning rate
     :param weight_decay: weight decay of optimizer
@@ -62,14 +58,13 @@ def train(
     :param clip_val: grad clipping limit
     """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = MMDL(image_dim, encoders, fusion, head).to(device)
 
     additional_params = []
     for m in additional_optimizing_modules:
         additional_params.extend(
             [p for p in m.parameters() if p.requires_grad])
     op = optimtype([p for p in model.parameters() if p.requires_grad] +
-                   additional_params, lr=lr, weight_decay=weight_decay)
+                    additional_params, lr=lr, weight_decay=weight_decay)
     bestvalloss = 10000
     bestacc = 0
     bestf1 = 0
@@ -77,7 +72,7 @@ def train(
 
     def _processinput(inp):
         if input_to_float:
-            if type(inp) == list:
+            if type(inp)==list:
                 return [i.float() for i in inp]
             else:
                 return inp.float()
@@ -121,7 +116,7 @@ def train(
             for j in valid_dataloader:
                 model.train()
                 out = model([_processinput(i).to(device)
-                             for i in j[:-1]])
+                              for i in j[:-1]])
 
                 if not (objective_args_dict is None):
                     objective_args_dict['reps'] = model.reps
@@ -258,7 +253,6 @@ def single_test(
             print("acc: " + str(accs) + ', ' + str(acc2))
             return {'Accuracy': accs}
 
-
 if __name__ == '__main__':
     audio_input_dim = 512
     HIDDEN_1 = 256
@@ -275,18 +269,14 @@ if __name__ == '__main__':
 
     train_loader, val_loader = get_dataloader('output')
 
-    audio_model = BiLSTM(input_size=audio_input_dim, hidden_1=HIDDEN_1, hidden_2=HIDDEN_2)
+    audio_model = BiLSTM(input_size=audio_input_dim, out_size=class_num, linear=True, hidden_1=HIDDEN_1, hidden_2=HIDDEN_2)
     image_model = swinv2_tiny_window16_256(pretrained=True)
     image_dim = image_model.head.in_features
-    em_dim = HIDDEN_2 + image_dim
-    image_model.head = Identity()
+    image_model.head = nn.Linear(image_dim, class_num)
 
     encoders = [audio_model.to(device), image_model.to(device)]
+    model = MajorityVoting(encoders).to(device)
 
-    head = MLP(em_dim, mlp_em_dim, class_num).to(device)
-
-    fusion = Concat().to(device)
-
-    train(encoders, fusion, head, image_dim, train_loader, val_loader, EPOCHS, optimtype=torch.optim.AdamW,
+    train(model, train_loader, val_loader, EPOCHS, task="classification", optimtype=torch.optim.AdamW,
           early_stop=True, lr=model_lr, save=model_save_path, weight_decay=weight_decay,
           objective=torch.nn.CrossEntropyLoss())
