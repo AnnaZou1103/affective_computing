@@ -15,9 +15,9 @@ class MMDL(nn.Module):
         outs = [self.encoders[0](inputs[0])]
 
         reduced_image = []
-        start_index=0
+        start_index = 0
         for num in inputs[2]:
-            image_feature = self.encoders[1](inputs[1][start_index: start_index+int(num.item())])
+            image_feature = self.encoders[1](inputs[1][start_index: start_index + int(num.item())])
             reduced_image.append(self.attention_block(image_feature))
             start_index += int(num.item())
         reduced_image = torch.stack(reduced_image)
@@ -39,12 +39,12 @@ class MajorityVoting(nn.Module):
 
         start_index = 0
         for (index, num) in enumerate(inputs[2]):
-            weight = 1/(1+num)
-            image_class = self.encoders[1](inputs[1][start_index: start_index+int(num.item())])
+            weight = 1 / (1 + num)
+            image_class = self.encoders[1](inputs[1][start_index: start_index + int(num.item())])
             image_class = torch.cat((image_class, torch.unsqueeze(audio_classes[index], 0)), 0)
-            result = torch.sum(image_class * weight, dim = 0)
+            result = torch.sum(image_class * weight, dim=0)
             outs.append(result)
-        return torch.stack(outs, dim = 0)
+        return torch.stack(outs, dim=0)
 
 
 class MLP(torch.nn.Module):

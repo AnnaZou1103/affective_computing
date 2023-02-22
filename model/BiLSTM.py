@@ -14,7 +14,6 @@ class BiLSTM(nn.Module):
         self.linear = linear
 
     def forward(self, x):
-        # [batch,seq_len,input_size]
         emb, _ = self.bilstm(x)
         emb = emb[:, -1]
         emb = self.hidden1(emb)

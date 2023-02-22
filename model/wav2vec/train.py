@@ -5,7 +5,7 @@ with an ECAPA-TDNN model.
 
 To run this recipe, do the following:
 
-> python train_lf.py hparams/train.yaml --data_folder /path/to/IEMOCAP
+> python train_ef.py hparams/train.yaml --data_folder /path/to/IEMOCAP
 
 Authors
  * Pierre-Yves Yanni 2021
