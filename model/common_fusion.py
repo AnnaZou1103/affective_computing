@@ -89,3 +89,65 @@ class LowRankTensorFusion(nn.Module):
             1, 0, 2)).squeeze() + self.fusion_bias
         output = output.view(-1, self.output_dim)
         return output
+
+
+class NLgate(torch.nn.Module):
+    """
+    Implements of Non-Local Gate-based Fusion.
+
+
+    See section F4 of https://arxiv.org/pdf/1905.12681.pdf for details
+    """
+
+    def __init__(self, thw_dim, c_dim, tf_dim, q_linear=None, k_linear=None, v_linear=None):
+        """
+        q_linear, k_linear, v_linear are none if no linear layer applied before q,k,v.
+
+        Otherwise, a tuple of (indim,outdim) is required for each of these 3 arguments.
+
+        :param thw_dim: See paper
+        :param c_dim: See paper
+        :param tf_dim: See paper
+        :param q_linear: See paper
+        :param k_linear: See paper
+        :param v_linear: See paper
+        """
+        super(NLgate, self).__init__()
+        self.qli = None
+        if q_linear is not None:
+            self.qli = nn.Linear(q_linear[0], q_linear[1])
+        self.kli = None
+        if k_linear is not None:
+            self.kli = nn.Linear(k_linear[0], k_linear[1])
+        self.vli = None
+        if v_linear is not None:
+            self.vli = nn.Linear(v_linear[0], v_linear[1])
+        self.thw_dim = thw_dim
+        self.c_dim = c_dim
+        self.tf_dim = tf_dim
+        self.softmax = nn.Softmax(dim=2)
+
+    def forward(self, x):
+        """
+        Apply Low-Rank TensorFusion to input.
+
+        :param x: An iterable of modalities to combine.
+        """
+        q = x[1]
+        k = x[0]
+        v = x[0]
+        if self.qli is None:
+            qin = q.view(-1, self.thw_dim, self.c_dim)
+        else:
+            qin = self.qli(q).view(-1, self.thw_dim, self.c_dim)
+        if self.kli is None:
+            kin = k.view(-1, self.c_dim, self.tf_dim)
+        else:
+            kin = self.kli(k).view(-1, self.c_dim, self.tf_dim)
+        if self.vli is None:
+            vin = v.view(-1, self.tf_dim, self.c_dim)
+        else:
+            vin = self.vli(v).view(-1, self.tf_dim, self.c_dim)
+        matmulled = torch.matmul(qin, kin)
+        finalout = torch.matmul(self.softmax(matmulled), vin)
+        return torch.flatten(qin + finalout, 1)

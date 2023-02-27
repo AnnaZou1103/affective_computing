@@ -2,7 +2,7 @@ from utils.get_data import get_dataloader
 import torch
 from torch import nn
 from model.common_model import MLP, MMDL, Identity
-from model.common_fusion import LowRankTensorFusion
+from model.common_fusion import NLgate
 from model.BiLSTM import BiLSTM
 from timm.models.swin_transformer_v2 import swinv2_tiny_window16_256
 from utils.performance import AUPRC, f1_score, accuracy, eval_affect
@@ -258,8 +258,6 @@ if __name__ == '__main__':
     audio_input_dim = 512
     HIDDEN_1 = 256
     HIDDEN_2 = 128
-    audio_feature = 32
-    image_feature = 128
     em_dim = 128
     mlp_em_dim = 512
     class_num = 6
@@ -274,15 +272,15 @@ if __name__ == '__main__':
 
     train_loader, val_loader = get_dataloader('output')
 
-    audio_model = BiLSTM(input_size=audio_input_dim, hidden_1=HIDDEN_1, hidden_2=HIDDEN_2, linear=True, out_size=audio_feature)
+    audio_model = BiLSTM(input_size=audio_input_dim, hidden_1=HIDDEN_1, hidden_2=HIDDEN_2)
     image_model = swinv2_tiny_window16_256(pretrained=True)
     image_dim = image_model.head.in_features
-    image_model.head = nn.Linear(image_dim, image_feature)
+    image_model.head = Identity()
 
     encoders = [audio_model.to(device), image_model.to(device)]
     head = MLP(em_dim, mlp_em_dim, class_num).to(device)
-    fusion = LowRankTensorFusion([audio_feature, image_feature], em_dim, rank).to(device)
-    model = MMDL(image_feature, encoders, fusion, head).to(device)
+    fusion = NLgate(24, 30, 10, (image_dim, 720), (HIDDEN_2, 300), (HIDDEN_2, 300))
+    model = MMDL(image_dim, encoders, fusion, head).to(device)
 
     train(model, train_loader, val_loader, EPOCHS, optimtype=torch.optim.AdamW,
           early_stop=True, lr=model_lr, save=model_save_path, weight_decay=weight_decay,
